@@ -78,8 +78,11 @@ def generate_sequence(x_dim, y_dim, order):
     return seq
 
 
-def folder_name(die_num, x, y):
-    return f'Die{die_num}_X{x}Y{y}'
+def device_path(die_num, x, y):
+    """Returns (die_folder, device_subfolder, full_path)"""
+    die_folder    = f'Die{die_num}'
+    device_folder = f'X{x}Y{y}'
+    return die_folder, device_folder, os.path.join(die_folder, device_folder)
 
 
 # ---------------------------------------------------------------------------
@@ -87,13 +90,13 @@ def folder_name(die_num, x, y):
 # ---------------------------------------------------------------------------
 
 def capture_and_save(die_num, x, y):
-    folder = folder_name(die_num, x, y)
-    os.makedirs(folder, exist_ok=True)
+    _, device_folder, full_path = device_path(die_num, x, y)
+    os.makedirs(full_path, exist_ok=True)
 
-    freqs  = get_frequencies()
+    freqs   = get_frequencies()
     db_vals = get_trace_db()
 
-    filepath = os.path.join(folder, f'{folder}.csv')
+    filepath = os.path.join(full_path, f'{device_folder}.csv')
     with open(filepath, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Frequency(Hz)', 'dB'])
@@ -128,9 +131,9 @@ def run_die(die_num, x_dim, y_dim, order):
     print('Enter = capture   s = skip   freq = change frequency range   q = quit\n')
 
     for i, (x, y) in enumerate(sequence):
-        current = folder_name(die_num, x, y)
+        current = f'X{x}Y{y}'
         while True:
-            cmd = input(f'[{i + 1}/{total}]  {current}  > ').strip().lower()
+            cmd = input(f'[{i + 1}/{total}]  Die{die_num}/{current}  > ').strip().lower()
             if cmd == '':
                 capture_and_save(die_num, x, y)
                 break

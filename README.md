@@ -29,12 +29,13 @@ Systematic single-trace capture script that walks through every device in a die 
 
 **Output folder structure example (4×2 die, X-first):**
 ```
-Die1_X1Y1/Die1_X1Y1.csv
-Die1_X2Y1/Die1_X2Y1.csv
-Die1_X3Y1/Die1_X3Y1.csv
-Die1_X4Y1/Die1_X4Y1.csv
-Die1_X1Y2/Die1_X1Y2.csv
-...
+Die1/
+    X1Y1/X1Y1.csv
+    X2Y1/X2Y1.csv
+    X3Y1/X3Y1.csv
+    X4Y1/X4Y1.csv
+    X1Y2/X1Y2.csv
+    ...
 ```
 
 **CSV format:**
@@ -70,8 +71,8 @@ Add `-s` to any plot command to save the figure as a PNG instead of displaying i
 
 | Command | Saves to |
 |---|---|
-| `dev Die3_X2Y4 -s` | `Die3_X2Y4/Die3_X2Y4_plot.png` |
-| `die 3 -s` | `Die3_X*Y*/Die3_overview.png` (one copy per device folder in die) |
+| `dev 3 X2Y4 -s` | `Die3/X2Y4/X2Y4_plot.png` |
+| `die 3 -s` | `Die3/X*Y*/Die3_overview.png` (one copy per device folder) |
 | `all -s` | Same as above, for every die |
 
 **Plot axes:** X = Frequency (MHz), Y = S11 (dB)
