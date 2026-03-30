@@ -48,12 +48,37 @@ Frequency(Hz),dB
 ...
 ```
 
+### `Adam_VNA_plot.py`
+Auto-detects all data collected by `Adam_VNA.py` and plots it interactively. Run from the same folder that contains the `Die*_*` subfolders.
+
+**Features:**
+- Scans the current directory for all `Die{number}_{Row}{Col}/` folders and their CSVs
+- Overlays all traces for a single device on one axes (color-coded by trace number)
+- Plots an entire die as a subplot grid (one subplot per device)
+- Plots all detected data at once (one figure per die)
+- `rescan` command picks up newly captured data without restarting
+
+**Commands:**
+
+| Command | Action |
+|---|---|
+| `[Enter]` / `all` | Plot every detected device, grouped by die |
+| `die <number>` | Plot all devices in one die (e.g. `die 3`) |
+| `dev <name>` | Plot all traces for one device (e.g. `dev Die3_B2`) |
+| `ls` | List all detected devices and trace counts |
+| `rescan` | Re-scan directory for new data |
+| `h` | Show help |
+| `q` | Quit |
+
+**Plot axes:** X = Frequency (MHz), Y = S11 (dB)
+
 ---
 
 ## Requirements
 
 - `pyvisa` — VISA instrument communication
 - `tdt` — TDT Synapse API (for sync scripts only)
+- `matplotlib`, `numpy` — plotting (`Adam_VNA_plot.py` only)
 - VNA connected at `192.168.0.1` over Ethernet
 
 ## Hardware
