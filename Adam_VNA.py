@@ -1,12 +1,64 @@
 import visa
 import csv
 import os
+import socket
 
 print('Welcome to Adam VNA Controller!')
 print('Initializing connection...')
 
 rm = visa.ResourceManager()
 SCPI_E5061 = rm.open_resource('TCPIP0::192.168.0.1::inst0::INSTR')
+
+# Remote notification target (set during setup)
+remote_ip   = None
+remote_port = None
+
+
+# ---------------------------------------------------------------------------
+# Remote notification
+# ---------------------------------------------------------------------------
+
+def setup_remote():
+    global remote_ip, remote_port
+    print('\nRemote notification setup:')
+    remote_ip   = input('  Target IP address : ').strip()
+    remote_port = int(input('  Target port       : ').strip())
+    if _try_send('PING'):
+        print('  Connection OK.')
+    else:
+        print('  Could not reach target — notifications disabled until reconnect.')
+
+
+def _try_send(message):
+    """Send a message via TCP. Returns True on success, False on failure."""
+    try:
+        with socket.create_connection((remote_ip, remote_port), timeout=3) as sock:
+            sock.sendall((message + '\n').encode())
+        return True
+    except Exception:
+        return False
+
+
+def notify(die_num, x, y):
+    """Send die+XY info to remote. On failure, ask user to retry or dismiss."""
+    if remote_ip is None:
+        return
+    message = f'Die{die_num}_X{x}Y{y}'
+    if _try_send(message):
+        return
+    # Connection failed — ask user
+    print(f'  [!] Failed to send notification ({message})')
+    while True:
+        choice = input('      Retry (r) or dismiss (d)? ').strip().lower()
+        if choice == 'r':
+            if _try_send(message):
+                print('      Sent.')
+                return
+            else:
+                print('      Still unreachable.')
+        elif choice == 'd':
+            print('      Notification dismissed.')
+            return
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +156,7 @@ def capture_and_save(die_num, x, y):
             writer.writerow([freq, db])
 
     print(f'  Saved → {filepath}  ({len(freqs)} points)')
+    notify(die_num, x, y)
 
 
 # ---------------------------------------------------------------------------
@@ -123,8 +176,8 @@ def setup_die():
 
 
 def run_die(die_num, x_dim, y_dim, order):
-    sequence = generate_sequence(x_dim, y_dim, order)
-    total    = len(sequence)
+    sequence    = generate_sequence(x_dim, y_dim, order)
+    total       = len(sequence)
     order_label = 'X-first' if order == 'x' else 'Y-first'
 
     print(f'\nDie {die_num} | {x_dim}×{y_dim} | {order_label} | {total} devices')
@@ -157,6 +210,7 @@ def run_die(die_num, x_dim, y_dim, order):
 
 def main():
     initialize()
+    setup_remote()
 
     while True:
         die_num, x_dim, y_dim, order = setup_die()
