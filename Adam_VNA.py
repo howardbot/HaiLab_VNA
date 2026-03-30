@@ -1,5 +1,4 @@
 import visa
-import time
 import csv
 import os
 
@@ -9,10 +8,10 @@ print('Initializing connection...')
 rm = visa.ResourceManager()
 SCPI_E5061 = rm.open_resource('TCPIP0::192.168.0.1::inst0::INSTR')
 
-die_number = None
-device_row = None
-device_col = None
 
+# ---------------------------------------------------------------------------
+# VNA setup
+# ---------------------------------------------------------------------------
 
 def initialize():
     SCPI_E5061.write(':SYST:PRES')
@@ -21,13 +20,21 @@ def initialize():
     SCPI_E5061.write(':CALC1:PARameter1:COUN 1')
     SCPI_E5061.write(':CALC1:PARameter1:SEL')
     SCPI_E5061.write(':CALC1:PARameter1:DEF S11')
-    SCPI_E5061.write(':CALC1:FORM MLOG')          # log magnitude → dB output
+    SCPI_E5061.write(':CALC1:FORM MLOG')           # log magnitude → dB
     SCPI_E5061.write(':SENS1:SWE:TYPE LIN')
-    SCPI_E5061.write(':SENS1:FREQ:STAR 300000')   # default: 300 kHz
-    SCPI_E5061.write(':SENS1:FREQ:STOP 500000000')# default: 500 MHz
+    SCPI_E5061.write(':SENS1:FREQ:STAR 300000')    # default 300 kHz
+    SCPI_E5061.write(':SENS1:FREQ:STOP 500000000') # default 500 MHz
     SCPI_E5061.write(':SENS1:SWE:POIN 1001')
     SCPI_E5061.write(':SENS1:SWE:TIME:AUTO 1')
     print('VNA initialized!')
+
+
+def set_frequency():
+    start = input('  Start frequency (Hz): ').strip()
+    stop  = input('  Stop  frequency (Hz): ').strip()
+    SCPI_E5061.write(f':SENS1:FREQ:STAR {start}')
+    SCPI_E5061.write(f':SENS1:FREQ:STOP {stop}')
+    print(f'  Frequency range set: {start} Hz – {stop} Hz')
 
 
 def get_frequencies():
@@ -39,46 +46,8 @@ def get_trace_db():
     SCPI_E5061.write('FORMat:DATA ASCii')
     raw = SCPI_E5061.query(':CALC1:DATA:FDAT?')
     values = raw.strip().split(',')
-    # FDAT for scalar formats (MLOG) returns (value, 0) pairs — take every other
+    # FDAT for MLOG returns (value, 0) pairs — take every other element
     return [float(values[i]) for i in range(0, len(values), 2)]
-
-
-def set_device():
-    global die_number, device_row, device_col
-    die_number = input('  Die number: ').strip()
-    device_row = input('  Row label (e.g. A, B, C): ').strip().upper()
-    device_col = input('  Column number (e.g. 1, 2, 3): ').strip()
-    print(f'  --> Device set to Die{die_number}_{device_row}{device_col}')
-
-
-def capture_trace():
-    folder = f'Die{die_number}_{device_row}{device_col}'
-    os.makedirs(folder, exist_ok=True)
-
-    existing = [f for f in os.listdir(folder) if f.endswith('.csv')]
-    trace_num = len(existing) + 1
-
-    freqs = get_frequencies()
-    db_vals = get_trace_db()
-
-    filename = f'{folder}_trace{trace_num:03d}.csv'
-    filepath = os.path.join(folder, filename)
-
-    with open(filepath, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Frequency(Hz)', 'dB'])
-        for freq, db in zip(freqs, db_vals):
-            writer.writerow([freq, db])
-
-    print(f'  Saved: {filepath}  ({len(freqs)} points)')
-
-
-def set_frequency():
-    start = input('  Start frequency (Hz): ').strip()
-    stop  = input('  Stop  frequency (Hz): ').strip()
-    SCPI_E5061.write(f':SENS1:FREQ:STAR {start}')
-    SCPI_E5061.write(f':SENS1:FREQ:STOP {stop}')
-    print(f'  Frequency range set: {start} Hz – {stop} Hz')
 
 
 def close():
@@ -87,38 +56,115 @@ def close():
     print('Connections closed.')
 
 
-def help_menu():
-    print('\nCommands:')
-    print('  [Enter]  capture one trace and save to CSV')
-    print('  d        set die number and device position (row/column)')
-    print('  freq     set start/stop frequency range')
-    print('  h        show this help')
-    print('  q        quit and close connections')
+# ---------------------------------------------------------------------------
+# Device sequencing
+# ---------------------------------------------------------------------------
 
+def generate_sequence(x_dim, y_dim, order):
+    """
+    Return an ordered list of (x, y) positions.
+    order='x' : X is the fast axis  X1Y1 → X2Y1 → ... → X1Y2 → ...
+    order='y' : Y is the fast axis  X1Y1 → X1Y2 → ... → X2Y1 → ...
+    """
+    seq = []
+    if order == 'x':
+        for y in range(1, y_dim + 1):
+            for x in range(1, x_dim + 1):
+                seq.append((x, y))
+    else:
+        for x in range(1, x_dim + 1):
+            for y in range(1, y_dim + 1):
+                seq.append((x, y))
+    return seq
+
+
+def folder_name(die_num, x, y):
+    return f'Die{die_num}_X{x}Y{y}'
+
+
+# ---------------------------------------------------------------------------
+# Capture
+# ---------------------------------------------------------------------------
+
+def capture_and_save(die_num, x, y):
+    folder = folder_name(die_num, x, y)
+    os.makedirs(folder, exist_ok=True)
+
+    freqs  = get_frequencies()
+    db_vals = get_trace_db()
+
+    filepath = os.path.join(folder, f'{folder}.csv')
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Frequency(Hz)', 'dB'])
+        for freq, db in zip(freqs, db_vals):
+            writer.writerow([freq, db])
+
+    print(f'  Saved → {filepath}  ({len(freqs)} points)')
+
+
+# ---------------------------------------------------------------------------
+# Die session
+# ---------------------------------------------------------------------------
+
+def setup_die():
+    print('')
+    die_num = input('Die number          : ').strip()
+    dims    = input('Dimension (X Y)     : ').strip().split()
+    x_dim, y_dim = int(dims[0]), int(dims[1])
+    order   = input('Traverse order (x/y): ').strip().lower()
+    if order not in ('x', 'y'):
+        print('  Invalid order, defaulting to x.')
+        order = 'x'
+    return die_num, x_dim, y_dim, order
+
+
+def run_die(die_num, x_dim, y_dim, order):
+    sequence = generate_sequence(x_dim, y_dim, order)
+    total    = len(sequence)
+    order_label = 'X-first' if order == 'x' else 'Y-first'
+
+    print(f'\nDie {die_num} | {x_dim}×{y_dim} | {order_label} | {total} devices')
+    print('Enter = capture   s = skip   freq = change frequency range   q = quit\n')
+
+    for i, (x, y) in enumerate(sequence):
+        current = folder_name(die_num, x, y)
+        while True:
+            cmd = input(f'[{i + 1}/{total}]  {current}  > ').strip().lower()
+            if cmd == '':
+                capture_and_save(die_num, x, y)
+                break
+            elif cmd == 's':
+                print('  Skipped.')
+                break
+            elif cmd == 'freq':
+                set_frequency()
+            elif cmd == 'q':
+                return False        # signal: quit everything
+            else:
+                print('  Enter=capture  s=skip  freq=set range  q=quit')
+
+    print(f'\nDie {die_num} complete! ({total} devices)')
+    return True                     # signal: continue
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     initialize()
-    print('\nSet up your first device:')
-    set_device()
-    help_menu()
 
     while True:
-        current = f'Die{die_number}_{device_row}{device_col}'
-        cmd = input(f'\n[{current}] Command (Enter = capture): ').strip().lower()
-
-        if cmd == '':
-            capture_trace()
-        elif cmd == 'd':
-            set_device()
-        elif cmd == 'freq':
-            set_frequency()
-        elif cmd == 'h':
-            help_menu()
-        elif cmd == 'q':
-            close()
+        die_num, x_dim, y_dim, order = setup_die()
+        cont = run_die(die_num, x_dim, y_dim, order)
+        if not cont:
             break
-        else:
-            print('  Unknown command. Type h for help.')
+        again = input('\nStart another die? (Enter = yes  q = quit): ').strip().lower()
+        if again == 'q':
+            break
+
+    close()
 
 
 main()

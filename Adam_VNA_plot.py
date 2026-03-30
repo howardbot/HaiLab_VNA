@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
-# Matches folder names like: Die3_B2, Die10_AA1
-FOLDER_RE = re.compile(r'^(Die(\w+)_([A-Z]+)(\d+))$')
-# Matches file names like: Die3_B2_trace001.csv
-FILE_RE   = re.compile(r'^Die\w+_[A-Z]+\d+_trace(\d+)\.csv$')
+# Matches folder names like: Die3_X2Y4, Die10_X1Y1
+FOLDER_RE = re.compile(r'^(Die(\w+)_X(\d+)Y(\d+))$')
+# Matches file names like: Die3_X2Y4.csv
+FILE_RE   = re.compile(r'^Die\w+_X\d+Y\d+\.csv$')
 
 
 # ---------------------------------------------------------------------------
@@ -78,27 +78,23 @@ def _save_fig(fig, path):
 
 
 def plot_device(device_name, trace_paths, ax=None, show=True, save=False):
-    """Overlay all traces for one device on a single axes."""
+    """Plot the single trace for one device."""
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=(8, 4))
 
-    colors = _colors(len(trace_paths))
-    for i, path in enumerate(trace_paths):
-        freqs, dbs = load_csv(path)
-        ax.plot(freqs / 1e6, dbs, color=colors[i], linewidth=0.8,
-                label=f'trace {i + 1:03d}')
+    freqs, dbs = load_csv(trace_paths[0])
+    ax.plot(freqs / 1e6, dbs, linewidth=0.8)
 
     ax.set_xlabel('Frequency (MHz)')
     ax.set_ylabel('S11 (dB)')
     ax.set_title(device_name)
-    ax.legend(fontsize=6, ncol=max(1, len(trace_paths) // 10))
     ax.grid(True, linestyle='--', alpha=0.4)
 
     if standalone:
         plt.tight_layout()
         if save:
-            # Save into the device's own folder: Die3_B2/Die3_B2_plot.png
+            # Save into the device's own folder: Die3_X2Y4/Die3_X2Y4_plot.png
             out = os.path.join(device_name, f'{device_name}_plot.png')
             _save_fig(fig, out)
         if show:

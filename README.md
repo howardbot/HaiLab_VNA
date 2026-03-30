@@ -13,32 +13,28 @@ Original VNA remote control script. Collects S11 traces at 10 Hz and saves to CS
 Updated version (Jack, Jan 2021). Adds custom frequency range input — e.g., `s 100 500` sets a range in Hz or MHz in addition to `lo`/`hi` presets.
 
 ### `Adam_VNA.py`
-Single-trace capture script organized by die and device position. Designed for systematic measurement of devices arranged in a die grid.
+Systematic single-trace capture script that walks through every device in a die automatically. Designed for measuring a full pad of devices organized in a die grid.
 
-**Features:**
-- Press **Enter** to capture one S11 trace (no continuous recording)
-- Saves **Frequency (Hz)** and **dB** (log magnitude) columns to CSV
-- Each device gets its own subfolder named `Die{number}_{Row}{Col}` (e.g., `Die3_B2/`)
-- Traces within a subfolder are auto-numbered: `Die3_B2_trace001.csv`, `Die3_B2_trace002.csv`, ...
-- User sets die number and row/column label at startup or any time mid-session
+**Startup prompts:**
+1. Die number
+2. Die dimension — X and Y count (e.g., `4 5` for a 4×5 grid)
+3. Traversal order — `x` (X-first: X1Y1 → X2Y1 → ...) or `y` (Y-first: X1Y1 → X1Y2 → ...)
 
-**Commands:**
+**Per-device loop:**
+- Shows the current device name and progress (e.g., `[3/20] Die1_X3Y1`)
+- Press **Enter** to capture one trace and auto-advance to the next device
+- Type `s` to skip the current device
+- Type `freq` to change the frequency range at any point
+- Type `q` to quit
 
-| Command | Action |
-|---|---|
-| `[Enter]` | Capture one trace and save to CSV |
-| `d` | Set die number and device position (row/column) |
-| `freq` | Set start/stop frequency range (Hz) |
-| `h` | Show help |
-| `q` | Quit and close connections |
-
-**Output folder structure example:**
+**Output folder structure example (4×2 die, X-first):**
 ```
-Die3_B2/
-    Die3_B2_trace001.csv
-    Die3_B2_trace002.csv
-Die3_C1/
-    Die3_C1_trace001.csv
+Die1_X1Y1/Die1_X1Y1.csv
+Die1_X2Y1/Die1_X2Y1.csv
+Die1_X3Y1/Die1_X3Y1.csv
+Die1_X4Y1/Die1_X4Y1.csv
+Die1_X1Y2/Die1_X1Y2.csv
+...
 ```
 
 **CSV format:**
@@ -74,8 +70,8 @@ Add `-s` to any plot command to save the figure as a PNG instead of displaying i
 
 | Command | Saves to |
 |---|---|
-| `dev Die3_B2 -s` | `Die3_B2/Die3_B2_plot.png` |
-| `die 3 -s` | `Die3_*/Die3_overview.png` (one copy per device folder in die) |
+| `dev Die3_X2Y4 -s` | `Die3_X2Y4/Die3_X2Y4_plot.png` |
+| `die 3 -s` | `Die3_X*Y*/Die3_overview.png` (one copy per device folder in die) |
 | `all -s` | Same as above, for every die |
 
 **Plot axes:** X = Frequency (MHz), Y = S11 (dB)
