@@ -1,9 +1,7 @@
 import os
 import re
 import csv
-import math
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
 
 # Matches top-level die folders: Die1, Die2, ...
@@ -69,75 +67,41 @@ def load_csv(path):
 # Plotting helpers
 # ---------------------------------------------------------------------------
 
-def _colors(n):
-    return cm.tab10(np.linspace(0, 0.9, max(n, 1)))
-
-
 def _save_fig(fig, path):
     fig.savefig(path, dpi=150, bbox_inches='tight')
     print(f'  Saved: {path}')
 
 
-def plot_device(die_num, device_name, csv_path, ax=None, show=True, save=False):
-    """Plot the single trace for one device."""
-    standalone = ax is None
-    if standalone:
-        fig, ax = plt.subplots(figsize=(8, 4))
+def plot_device(die_num, device_name, csv_path, show=True, save=False):
+    """Plot one device on its own figure."""
+    fig, ax = plt.subplots(figsize=(8, 4))
 
     freqs, dbs = load_csv(csv_path)
     ax.plot(freqs / 1e6, dbs, linewidth=0.8)
     ax.set_xlabel('Frequency (MHz)')
     ax.set_ylabel('S11 (dB)')
-    ax.set_title(f'Die{die_num} / {device_name}')
     ax.grid(True, linestyle='--', alpha=0.4)
 
-    if standalone:
-        plt.tight_layout()
-        if save:
-            # Die1/X2Y4/X2Y4_plot.png
-            out = os.path.join(f'Die{die_num}', device_name, f'{device_name}_plot.png')
-            _save_fig(fig, out)
-        if show:
-            plt.show()
-        return fig
+    plt.tight_layout()
+    if save:
+        out = os.path.join(f'Die{die_num}', device_name, f'{device_name}_plot.png')
+        _save_fig(fig, out)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def plot_die(die_num, die_devices, show=True, save=False):
-    """One figure with a subplot grid for every device in the die."""
-    names = sorted(die_devices, key=lambda s: [int(c) for c in re.findall(r'\d+', s)])
-    n     = len(names)
-    cols  = math.ceil(math.sqrt(n))
-    rows  = math.ceil(n / cols)
-
-    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 3.5 * rows), squeeze=False)
-    fig.suptitle(f'Die {die_num}', fontsize=14, fontweight='bold')
-
-    for idx, name in enumerate(names):
-        ax = axes[idx // cols][idx % cols]
-        plot_device(die_num, name, die_devices[name], ax=ax, show=False, save=False)
-
-    for idx in range(n, rows * cols):
-        axes[idx // cols][idx % cols].set_visible(False)
-
-    plt.tight_layout()
-
-    if save:
-        # Save overview into each device subfolder: Die1/X1Y1/Die1_overview.png
-        for name in names:
-            out = os.path.join(f'Die{die_num}', name, f'Die{die_num}_overview.png')
-            _save_fig(fig, out)
-
-    if show:
-        plt.show()
-    return fig
+    """Plot each device in the die individually."""
+    for name in sorted(die_devices, key=lambda s: [int(c) for c in re.findall(r'\d+', s)]):
+        plot_device(die_num, name, die_devices[name], show=show, save=save)
 
 
 def plot_all(dies, show=True, save=False):
-    """One figure per die."""
-    figs = []
+    """Plot every device across all dies."""
     for die_num in sorted(dies, key=lambda d: int(d) if d.isdigit() else d):
-        figs.append(plot_die(die_num, dies[die_num], show=show, save=save))
-    return figs
+        plot_die(die_num, dies[die_num], show=show, save=save)
 
 
 # ---------------------------------------------------------------------------
