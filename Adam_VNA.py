@@ -30,33 +30,40 @@ def setup_remote():
 
 
 def _try_send(message):
-    """Send a message via TCP. Returns True on success, False on failure."""
+    """
+    Send filename string to the camera server over TCP and return the reply.
+    The server expects a plain string (e.g. 'Die1_X2Y4'), captures one frame,
+    saves it, then replies 'OK saved=...' or 'ERR ...'.
+    Returns the reply string on success, None on network failure.
+    """
     try:
-        with socket.create_connection((remote_ip, remote_port), timeout=3) as sock:
-            sock.sendall((message + '\n').encode())
-        return True
-    except Exception:
-        return False
+        with socket.create_connection((remote_ip, remote_port), timeout=5) as sock:
+            sock.sendall((message + '\n').encode('utf-8'))
+            reply = sock.recv(4096).decode('utf-8').strip()
+        return reply
+    except Exception as e:
+        return None
 
 
 def notify(die_num, x, y):
-    """Send die+XY info to remote. On failure, ask user to retry or dismiss."""
+    """Send die+XY as filename to camera server. On failure, ask retry or dismiss."""
     if remote_ip is None:
         return
     message = f'Die{die_num}_X{x}Y{y}'
-    if _try_send(message):
-        return
-    # Connection failed — ask user
-    print(f'  [!] Failed to send notification ({message})')
     while True:
+        reply = _try_send(message)
+        if reply is not None:
+            if reply.startswith('OK'):
+                print(f'  Camera: {reply}')
+            else:
+                print(f'  Camera error: {reply}')
+            return
+        # Network failure — ask user
+        print(f'  [!] Could not reach camera server ({remote_ip}:{remote_port})')
         choice = input('      Retry (r) or dismiss (d)? ').strip().lower()
         if choice == 'r':
-            if _try_send(message):
-                print('      Sent.')
-                return
-            else:
-                print('      Still unreachable.')
-        elif choice == 'd':
+            continue
+        else:
             print('      Notification dismissed.')
             return
 
