@@ -70,13 +70,13 @@ Auto-detects all data collected by `Adam_VNA.py` and plots it interactively. Run
 | `h` | Show help |
 | `q` | Quit |
 
-Append `save` to any plot command to save the figure as a PNG into the corresponding folder:
+Add `-s` to any plot command to save the figure as a PNG instead of displaying it:
 
 | Command | Saves to |
 |---|---|
-| `dev Die3_B2 save` | `Die3_B2/Die3_B2_plot.png` |
-| `die 3 save` | `Die3_*/Die3_overview.png` (one copy per device folder in die) |
-| `all save` | Same as above, for every die |
+| `dev Die3_B2 -s` | `Die3_B2/Die3_B2_plot.png` |
+| `die 3 -s` | `Die3_*/Die3_overview.png` (one copy per device folder in die) |
+| `all -s` | Same as above, for every die |
 
 **Plot axes:** X = Frequency (MHz), Y = S11 (dB)
 

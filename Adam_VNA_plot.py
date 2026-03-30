@@ -155,10 +155,10 @@ def help_menu():
     print('  [Enter] / all          plot every detected device (grouped by die)')
     print('  die <number>           plot all devices in a die  (e.g. die 3)')
     print('  dev <name>             plot all traces for one device (e.g. dev Die3_B2)')
-    print('  Append "save" to any plot command to save the figure:')
-    print('    dev Die3_B2 save     -> Die3_B2/Die3_B2_plot.png')
-    print('    die 3 save           -> Die3_*/Die3_overview.png (per device folder)')
-    print('    all save             -> same, for every die')
+    print('  Add -s to any plot command to save instead of display:')
+    print('    dev Die3_B2 -s       -> saves Die3_B2/Die3_B2_plot.png')
+    print('    die 3 -s             -> saves Die3_*/Die3_overview.png (per device folder)')
+    print('    all -s               -> same, for every die')
     print('  ls                     list detected devices')
     print('  rescan                 re-scan directory for new data')
     print('  h                      show this help')
@@ -187,33 +187,36 @@ def main():
         if not tokens:
             tokens = ['all']
 
-        save = tokens[-1].lower() == 'save'
+        save = '-s' in tokens
         if save:
-            tokens = tokens[:-1]
+            tokens = [t for t in tokens if t != '-s']
+
+        # -s: save only (no display); otherwise show only (no save)
+        show = not save
 
         if not tokens or tokens[0] == 'all':
-            plot_all(devices, save=save)
+            plot_all(devices, show=show, save=save)
 
         elif tokens[0] == 'die':
             if len(tokens) < 2:
-                print('  Usage: die <number> [save]')
+                print('  Usage: die <number> [-s]')
                 continue
             die_num = tokens[1]
             dies = group_by_die(devices)
             if die_num not in dies:
                 print(f'  Die {die_num} not found. Use "ls" to see available dies.')
             else:
-                plot_die(die_num, dies[die_num], save=save)
+                plot_die(die_num, dies[die_num], show=show, save=save)
 
         elif tokens[0] == 'dev':
             if len(tokens) < 2:
-                print('  Usage: dev <device_name> [save]  (e.g. dev Die3_B2 save)')
+                print('  Usage: dev <device_name> [-s]  (e.g. dev Die3_B2 -s)')
                 continue
             name = tokens[1]
             if name not in devices:
                 print(f'  Device "{name}" not found. Use "ls" to see available devices.')
             else:
-                plot_device(name, devices[name], save=save)
+                plot_device(name, devices[name], show=show, save=save)
 
         elif tokens[0] == 'ls':
             list_devices(devices)
