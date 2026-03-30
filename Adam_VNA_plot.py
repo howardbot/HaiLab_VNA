@@ -72,7 +72,12 @@ def _colors(n):
     return cm.tab10(np.linspace(0, 0.9, max(n, 1)))
 
 
-def plot_device(device_name, trace_paths, ax=None, show=True):
+def _save_fig(fig, path):
+    fig.savefig(path, dpi=150, bbox_inches='tight')
+    print(f'  Saved: {path}')
+
+
+def plot_device(device_name, trace_paths, ax=None, show=True, save=False):
     """Overlay all traces for one device on a single axes."""
     standalone = ax is None
     if standalone:
@@ -81,8 +86,8 @@ def plot_device(device_name, trace_paths, ax=None, show=True):
     colors = _colors(len(trace_paths))
     for i, path in enumerate(trace_paths):
         freqs, dbs = load_csv(path)
-        label = f'trace {i + 1:03d}'
-        ax.plot(freqs / 1e6, dbs, color=colors[i], linewidth=0.8, label=label)
+        ax.plot(freqs / 1e6, dbs, color=colors[i], linewidth=0.8,
+                label=f'trace {i + 1:03d}')
 
     ax.set_xlabel('Frequency (MHz)')
     ax.set_ylabel('S11 (dB)')
@@ -92,12 +97,16 @@ def plot_device(device_name, trace_paths, ax=None, show=True):
 
     if standalone:
         plt.tight_layout()
+        if save:
+            # Save into the device's own folder: Die3_B2/Die3_B2_plot.png
+            out = os.path.join(device_name, f'{device_name}_plot.png')
+            _save_fig(fig, out)
         if show:
             plt.show()
         return fig
 
 
-def plot_die(die_num, die_devices, show=True):
+def plot_die(die_num, die_devices, show=True, save=False):
     """One figure with a subplot grid for every device in the die."""
     names = sorted(die_devices)
     n = len(names)
@@ -110,24 +119,30 @@ def plot_die(die_num, die_devices, show=True):
 
     for idx, name in enumerate(names):
         ax = axes[idx // cols][idx % cols]
-        plot_device(name, die_devices[name], ax=ax, show=False)
+        plot_device(name, die_devices[name], ax=ax, show=False, save=False)
 
-    # Hide unused subplots
     for idx in range(n, rows * cols):
         axes[idx // cols][idx % cols].set_visible(False)
 
     plt.tight_layout()
+
+    if save:
+        # Save one copy into each device subfolder within this die
+        for name in names:
+            out = os.path.join(name, f'Die{die_num}_overview.png')
+            _save_fig(fig, out)
+
     if show:
         plt.show()
     return fig
 
 
-def plot_all(devices, show=True):
+def plot_all(devices, show=True, save=False):
     """One figure per die."""
     dies = group_by_die(devices)
     figs = []
     for die_num in sorted(dies):
-        figs.append(plot_die(die_num, dies[die_num], show=show))
+        figs.append(plot_die(die_num, dies[die_num], show=show, save=save))
     return figs
 
 
@@ -140,6 +155,10 @@ def help_menu():
     print('  [Enter] / all          plot every detected device (grouped by die)')
     print('  die <number>           plot all devices in a die  (e.g. die 3)')
     print('  dev <name>             plot all traces for one device (e.g. dev Die3_B2)')
+    print('  Append "save" to any plot command to save the figure:')
+    print('    dev Die3_B2 save     -> Die3_B2/Die3_B2_plot.png')
+    print('    die 3 save           -> Die3_*/Die3_overview.png (per device folder)')
+    print('    all save             -> same, for every die')
     print('  ls                     list detected devices')
     print('  rescan                 re-scan directory for new data')
     print('  h                      show this help')
@@ -165,29 +184,36 @@ def main():
         cmd = input('\nCommand: ').strip()
         tokens = cmd.split()
 
+        if not tokens:
+            tokens = ['all']
+
+        save = tokens[-1].lower() == 'save'
+        if save:
+            tokens = tokens[:-1]
+
         if not tokens or tokens[0] == 'all':
-            plot_all(devices)
+            plot_all(devices, save=save)
 
         elif tokens[0] == 'die':
             if len(tokens) < 2:
-                print('  Usage: die <number>')
+                print('  Usage: die <number> [save]')
                 continue
             die_num = tokens[1]
             dies = group_by_die(devices)
             if die_num not in dies:
                 print(f'  Die {die_num} not found. Use "ls" to see available dies.')
             else:
-                plot_die(die_num, dies[die_num])
+                plot_die(die_num, dies[die_num], save=save)
 
         elif tokens[0] == 'dev':
             if len(tokens) < 2:
-                print('  Usage: dev <device_name>  (e.g. dev Die3_B2)')
+                print('  Usage: dev <device_name> [save]  (e.g. dev Die3_B2 save)')
                 continue
             name = tokens[1]
             if name not in devices:
                 print(f'  Device "{name}" not found. Use "ls" to see available devices.')
             else:
-                plot_device(name, devices[name])
+                plot_device(name, devices[name], save=save)
 
         elif tokens[0] == 'ls':
             list_devices(devices)
